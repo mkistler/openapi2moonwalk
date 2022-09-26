@@ -1,6 +1,6 @@
 {
   "name": "openapi2moonwalk",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Convert OpenAPI 3.0.x API definition to MoonWalk format.",
   "main": "app.js",
   "type": "module",
