@@ -1,0 +1,32 @@
+{
+  "name": "openapi2moonwalk",
+  "version": "0.0.1",
+  "description": "Convert OpenAPI 3.0.x API definition to MoonWalk format.",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "test": "jest",
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mkistler/openapi2moonwalk.git"
+  },
+  "keywords": [
+    "openapi"
+  ],
+  "author": "Mike Kistler",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mkistler/openapi2moonwalk/issues"
+  },
+  "homepage": "https://github.com/mkistler/openapi2moonwalk#readme",
+  "dependencies": {
+    "@apicurio/data-models": "^1.1.26",
+    "commander": "^9.4.0",
+    "typescript": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^18.7.21"
+  }
+}
