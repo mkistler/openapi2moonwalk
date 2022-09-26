@@ -16,6 +16,13 @@ import {
   IDefinition,
 } from "@apicurio/data-models";
 
+function addExtensions(node: Info, object) {
+  const extensions: Extension[] = node.getExtensions();
+  for (const extension of extensions) {
+    object[extension.name] = extension.value;
+  }
+}
+
 export default class MyCustomVisitor implements IVisitor {
   document: object;
   visitComponents(node) {
@@ -39,10 +46,24 @@ export default class MyCustomVisitor implements IVisitor {
   visitInfo(node: Info) {
     const info = {
       title: node.title,
-      description: node.description,
-      termsOfService: node.termsOfService,
-      version: node.version,
+      description: node.description || undefined,
+      termsOfService: node.termsOfService || undefined,
+      version: node.version || undefined,
     };
+    if (node.contact) {
+      info["contact"] = {
+        name: node.contact.name || undefined,
+        url: node.contact.url || undefined,
+        email: node.contact.email || undefined,
+      };
+    }
+    if (node.license) {
+      info["license"] = {
+        name: node.license.name,
+        url: node.license.url || undefined,
+      };
+    }
+    addExtensions(node, info);
     this.document["info"] = info;
   }
   visitItemsSchema(node) {
