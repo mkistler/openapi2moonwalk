@@ -2,12 +2,7 @@
 
 import { readFileSync } from "fs";
 import { Command } from "commander";
-import {
-  Library,
-  Document,
-  IVisitor,
-  TraverserDirection,
-} from "@apicurio/data-models";
+import { Library, Document, TraverserDirection } from "@apicurio/data-models";
 import MyCustomVisitor from "./visitor.js";
 import { exit } from "process";
 
@@ -29,10 +24,6 @@ let openApiData: string = readFileSync(program.args[0], "utf8");
 // data.  This will convert from the source string into an instance of
 // the OpenAPI data model.
 let document: Document = Library.readDocumentFromJSONString(openApiData);
-
-// Here you can analyze or manipulate the model.
-document.info.version = "1.7";
-document.info.description = "Made some changes to the OpenAPI document!";
 
 // Validate that your changes are OK.
 let problems = await Library.validateDocument(document, null, []);
