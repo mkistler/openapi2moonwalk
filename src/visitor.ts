@@ -13,16 +13,20 @@ import {
   Tag,
   ValidationProblem,
   IDefinition,
+  Oas30MediaType,
   Oas30PathItem,
   OasOperation,
   Oas30Parameter,
   OasPathItem,
   Oas30Schema,
+  Oas30RequestBody,
+  Oas30Response,
 } from "@apicurio/data-models";
 import { notEqual } from "assert";
+import { Console } from "console";
 
 function addExtensions(node: Info, object) {
-  const extensions: Extension[] = node.getExtensions();
+  const extensions: Extension[] = node.getExtensions() || [];
   for (const extension of extensions) {
     object[extension.name] = extension.value;
   }
@@ -53,9 +57,10 @@ function getPathKey(node: OasPathItem): string {
   return pathKeys.get(oasPath);
 }
 
-export default class MyCustomVisitor implements IVisitor {
+export default class Oas30Visitor implements IVisitor {
   document: object;
-  currentOperation: object;
+  currentRequest: object;
+  visitAdditionalPropertiesSchema(node) {}
   visitComponents(node) {
     //throw new Error('Method not implemented.');
   }
@@ -74,6 +79,7 @@ export default class MyCustomVisitor implements IVisitor {
   visitHeader(node) {
     //throw new Error('Method not implemented.');
   }
+  visitImplicitOAuthFlow(node) {}
   visitInfo(node: Info) {
     const info = {
       title: node.title,
@@ -106,6 +112,7 @@ export default class MyCustomVisitor implements IVisitor {
   visitMediaType(node: License) {
     //throw new Error('Method not implemented.');
   }
+  visitOAuthFlows(node) {}
   visitOperation(node: OasOperation) {
     const pathKey = getPathKey(node.parent() as OasPathItem);
     if (!this.document["paths"][pathKey]["requests"]) {
@@ -113,9 +120,13 @@ export default class MyCustomVisitor implements IVisitor {
     }
     const requestKey = node.operationId || node.getMethod();
     this.document["paths"][pathKey]["requests"][requestKey] = {
+      description: node.description || undefined,
+      summary: node.summary || undefined,
       method: node.getMethod(),
+      tags: node.tags || undefined,
+      responses: {},
     };
-    this.currentOperation =
+    this.currentRequest =
       this.document["paths"][pathKey]["requests"][requestKey];
     //throw new Error('Method not implemented.');
   }
@@ -127,16 +138,16 @@ export default class MyCustomVisitor implements IVisitor {
       // We currently only handle path and query parameters
       return;
     }
-    if (this.currentOperation) {
-      if (!this.currentOperation["parameterSchema"]) {
-        this.currentOperation["parameterSchema"] = {
+    if (this.currentRequest) {
+      if (!this.currentRequest["parameterSchema"]) {
+        this.currentRequest["parameterSchema"] = {
           type: "object",
           properties: {},
         };
       }
     }
     const oasSchema = node.schema as Oas30Schema;
-    this.currentOperation["parameterSchema"]["properties"][node.name] = {
+    this.currentRequest["parameterSchema"]["properties"][node.name] = {
       type: oasSchema.type || undefined,
       format: oasSchema.format || undefined,
       description: oasSchema.description || undefined,
@@ -152,14 +163,69 @@ export default class MyCustomVisitor implements IVisitor {
       summary: node.summary || undefined,
       description: node.description || undefined,
     };
-    this.currentOperation = undefined;
+    this.currentRequest = undefined;
   }
   visitPropertySchema(node) {
     //throw new Error('Method not implemented.');
   }
-  visitRequestBody(node) {}
+  visitRequestBody(node: Oas30RequestBody) {
+    if (this.currentRequest) {
+      const mediaTypes = node.getMediaTypes().map((n) => n.getName());
+      if (mediaTypes.length > 1) {
+        console.log(
+          "MoonWalk does not yet handle request bodies with multiple content types"
+        );
+      }
+      this.currentRequest["contentType"] = mediaTypes[0];
+    }
+  }
+  visitRequestBodyDefinition(node) {}
   visitSchemaDefinition(node: IDefinition) {
     //throw new Error('Method not implemented.');
+  }
+  visitResponses(node) {}
+  visitResponse(node: Oas30Response) {
+    if (this.currentRequest) {
+      // Since responses must have unique status codes in Oas30, we'll create the response name
+      // from the status code.
+      // https://www.rfc-editor.org/rfc/rfc9110.html#name-status-codes
+      const responseNameMap: Map<string, string> = new Map<string, string>([
+        ["200", "OK"],
+        ["201", "Created"],
+        ["202", "Accepted"],
+        ["204", "No Content"],
+        ["400", "Bad Request"],
+        ["401", "Unauthorized"],
+        ["403", "Forbidden"],
+        ["404", "Not Found"],
+        ["405", "Method Not Allowed"],
+      ]);
+      const statusCode = node.getStatusCode() || "default";
+      const responseNameBase = responseNameMap.get(statusCode) || statusCode;
+      // Create one response for each media-type,
+      const mediaTypes = node.getMediaTypes().map((n) => n.getName());
+      if (mediaTypes.length <= 1) {
+        this.currentRequest["responses"][responseNameBase] = {
+          statusCode,
+          description: node.description, // description is required in Oas30
+        };
+        if (mediaTypes.length === 1) {
+          this.currentRequest["responses"][responseNameBase]["contentType"] =
+            mediaTypes[0];
+        }
+      }
+      for (const contentType of mediaTypes) {
+        const responseName =
+          responseNameBase +
+          "-" +
+          contentType.replace(/\W+(?!$)/g, "-").toLowerCase();
+        this.currentRequest["responses"][responseName] = {
+          statusCode,
+          description: node.description, // description is required in Oas30
+          contentType,
+        };
+      }
+    }
   }
   visitSchema(node: Oas30Schema) {
     //throw new Error('Method not implemented.');
@@ -168,12 +234,6 @@ export default class MyCustomVisitor implements IVisitor {
     //throw new Error('Method not implemented.');
   }
   visitServer(node) {
-    //throw new Error('Method not implemented.');
-  }
-  visitResponses(node) {
-    //throw new Error('Method not implemented.');
-  }
-  visitResponse(node) {
     //throw new Error('Method not implemented.');
   }
   visitSecurityScheme(node: SecurityScheme) {
@@ -185,4 +245,5 @@ export default class MyCustomVisitor implements IVisitor {
   visitValidationProblem(problem: ValidationProblem) {
     //throw new Error('Method not implemented.');
   }
+  visitXML(node) {}
 }
