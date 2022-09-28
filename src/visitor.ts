@@ -21,6 +21,7 @@ import {
   Oas30RequestBody,
   Oas30Response,
   Schema,
+  Oas30SchemaDefinition,
 } from "@apicurio/data-models";
 import { notEqual } from "assert";
 import { Console } from "console";
@@ -131,7 +132,7 @@ class OperationVisitor implements IVisitor {
     const statusCode = node.getStatusCode() || "default";
     const responseNameBase = responseNameMap.get(statusCode) || statusCode;
     // Create one response for each media-type,
-    const mediaTypes = node.getMediaTypes().map((n) => n.getName());
+    const mediaTypes = node.getMediaTypes();
     if (mediaTypes.length <= 1) {
       this.request["responses"][responseNameBase] = {
         statusCode,
@@ -139,19 +140,28 @@ class OperationVisitor implements IVisitor {
       };
       if (mediaTypes.length === 1) {
         this.request["responses"][responseNameBase]["contentType"] =
-          mediaTypes[0];
+          mediaTypes[0].getName();
+        const schema = node.getMediaTypes()[0].schema;
+        this.request["responses"][responseNameBase]["contentSchema"] =
+          Library.writeNode(schema);
       }
     }
-    for (const contentType of mediaTypes) {
+    for (const mediaType of mediaTypes) {
       const responseName =
         responseNameBase +
         "-" +
-        contentType.replace(/\W+(?!$)/g, "-").toLowerCase();
+        mediaType
+          .getName()
+          .replace(/\W+(?!$)/g, "-")
+          .toLowerCase();
       this.request["responses"][responseName] = {
         statusCode,
         description: node.description, // description is required in Oas30
-        contentType,
+        contentType: mediaType.getName(),
       };
+      const schema = mediaType.schema;
+      this.request["responses"][responseName]["contentSchema"] =
+        Library.writeNode(schema);
     }
   }
   visitRequestBody(node) {}
@@ -313,8 +323,10 @@ export default class Oas30Visitor implements IVisitor {
   }
   visitRequestBody(node: Oas30RequestBody) {}
   visitRequestBodyDefinition(node) {}
-  visitSchemaDefinition(node: IDefinition) {
-    //throw new Error('Method not implemented.');
+  visitSchemaDefinition(node: Oas30SchemaDefinition) {
+    this.document["components"] ??= { schemas: {} };
+    const schema = Library.writeNode(node);
+    this.document["components"]["schemas"][node.getName()] = schema;
   }
   visitResponses(node) {}
   visitResponse(node: Oas30Response) {}
