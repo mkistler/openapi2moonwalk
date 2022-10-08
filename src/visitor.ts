@@ -1,33 +1,19 @@
 import {
-  Document,
   IVisitor,
-  Contact,
   Extension,
-  ExternalDocumentation,
-  Info,
   Library,
-  License,
-  SecurityRequirement,
-  SecurityScheme,
+  Server,
   Tag,
   TraverserDirection,
-  ValidationProblem,
-  IDefinition,
+  Oas30Document,
   Oas30Operation,
   Oas30Parameter,
   Oas30PathItem,
-  Oas30Schema,
-  Oas30RequestBody,
-  Oas30Response,
+  Oas30RequestBodyDefinition,
   Oas30SchemaDefinition,
+  Oas30SecurityScheme,
 } from "@apicurio/data-models";
-
-function addExtensions(node: Info, object) {
-  const extensions: Extension[] = node.getExtensions() || [];
-  for (const extension of extensions) {
-    object[extension.name] = extension.value;
-  }
-}
+import OperationVisitor from "./operation-visitor.js";
 
 // Map of OAS path to MoonWalk pathKey.
 // This memoizes the result of the function below.
@@ -60,194 +46,73 @@ function getPathKey(node: Oas30PathItem): string {
   return pathKeys.get(oasPath);
 }
 
-// Construct a request for the operation using just the specified contentType request body
-class OperationVisitor implements IVisitor {
-  request: object = {};
-  contentType: string;
-  constructor(contentType: string) {
-    this.contentType = contentType;
-  }
-  visitExtension(node: Extension) {
-    this.request[node.name] = node.value;
-  }
-  visitExternalDocumentation(node: ExternalDocumentation) {
-    throw new Error("Method not implemented.");
-  }
-  visitInfo(node: Info) {}
-  visitLicense(node: License) {}
-  visitOperation(node: Oas30Operation) {
-    const parameterSchema = node.parameters?.some((p) =>
-      ["path", "query"].includes(p.in)
-    )
-      ? {
-          type: "object",
-          properties: {},
-        }
-      : undefined;
-    this.request = {
-      description: node.description || undefined,
-      summary: node.summary || undefined,
-      method: node.getMethod(),
-      parameterSchema,
-      contentType: this.contentType,
-      tags: node.tags || undefined,
-      responses: {},
-    };
-  }
-  visitParameter(node: Oas30Parameter) {
-    // We currently only handle path and query parameters
-    if (["path", "query"].includes(node.in)) {
-      const oasSchema = node.schema as Oas30Schema;
-      this.request["parameterSchema"]["properties"][node.name] = {
-        type: oasSchema.type || undefined,
-        format: oasSchema.format || undefined,
-        description: oasSchema.description || undefined,
-      };
-      if (node.required) {
-        this.request["parameterSchema"]["required"] ??= [];
-        this.request["parameterSchema"]["required"].push(node.name);
-      }
-    }
-  }
-  visitResponse(node: Oas30Response) {
-    // Since responses must have unique status codes in Oas30, we'll create the response name
-    // from the status code.
-    // https://www.rfc-editor.org/rfc/rfc9110.html#name-status-codes
-    const responseNameMap: Map<string, string> = new Map<string, string>([
-      ["200", "OK"],
-      ["201", "Created"],
-      ["202", "Accepted"],
-      ["204", "No Content"],
-      ["400", "Bad Request"],
-      ["401", "Unauthorized"],
-      ["403", "Forbidden"],
-      ["404", "Not Found"],
-      ["405", "Method Not Allowed"],
-    ]);
-    const statusCode = node.getStatusCode() || "default";
-    const responseNameBase = responseNameMap.get(statusCode) || statusCode;
-    // Create one response for each media-type,
-    const mediaTypes = node.getMediaTypes();
-    if (mediaTypes.length <= 1) {
-      this.request["responses"][responseNameBase] = {
-        statusCode,
-        description: node.description, // description is required in Oas30
-      };
-      if (mediaTypes.length === 1) {
-        this.request["responses"][responseNameBase]["contentType"] =
-          mediaTypes[0].getName();
-        const schema = node.getMediaTypes()[0].schema;
-        this.request["responses"][responseNameBase]["contentSchema"] =
-          Library.writeNode(schema);
-      }
-    }
-    for (const mediaType of mediaTypes) {
-      const responseName =
-        responseNameBase +
-        "-" +
-        mediaType
-          .getName()
-          .replace(/\W+(?!$)/g, "-")
-          .toLowerCase();
-      this.request["responses"][responseName] = {
-        statusCode,
-        description: node.description, // description is required in Oas30
-        contentType: mediaType.getName(),
-      };
-      const schema = mediaType.schema;
-      this.request["responses"][responseName]["contentSchema"] =
-        Library.writeNode(schema);
-    }
-  }
-  visitRequestBody(node) {}
-  visitAdditionalPropertiesSchema(node) {}
-  visitHeader(node) {}
-  visitItemsSchema(node) {}
-  visitMediaType(node) {}
-  visitResponses(node) {}
-  visitSchema(node) {}
-  visitSecurityRequirement(node: SecurityRequirement) {}
-  // Unneeded methods
-  visitContact(node: Contact) {
-    throw new Error("Method not implemented.");
-  }
-  visitDocument(node: Document) {
-    throw new Error("Method not implemented.");
-  }
-  visitParameterDefinition(node: IDefinition) {
-    throw new Error("Method not implemented.");
-  }
-  visitSchemaDefinition(node: IDefinition) {
-    throw new Error("Method not implemented.");
-  }
-  visitSecurityScheme(node: SecurityScheme) {
-    throw new Error("Method not implemented.");
-  }
-  visitTag(node: Tag) {
-    throw new Error("Method not implemented.");
-  }
-  visitValidationProblem(problem: ValidationProblem) {
-    throw new Error("Method not implemented.");
-  }
-}
-
 export default class Oas30Visitor implements IVisitor {
   document: object;
-  visitAdditionalPropertiesSchema(node) {}
-  visitComponents(node) {
-    //throw new Error('Method not implemented.');
-  }
-  visitContact(node: Contact) {
-    //throw new Error('Method not implemented.');
-  }
-  visitDocument(node: Document) {
+  visitDocument(node: Oas30Document) {
     this.document = {
       openapi: "4.0.0",
+      info: Library.writeNode(node.info),
+      externalDocs: node.externalDocs
+        ? Library.writeNode(node.externalDocs)
+        : undefined,
+      servers: node.servers ? [] : undefined,
+      tags: node.tags ? [] : undefined,
     };
-  }
-  visitExtension(node: Extension) {
-    //throw new Error('Method not implemented.');
-  }
-  visitExternalDocumentation(node: ExternalDocumentation) {
-    //throw new Error('Method not implemented.');
-  }
-  visitHeader(node) {
-    //throw new Error('Method not implemented.');
-  }
-  visitImplicitOAuthFlow(node) {}
-  visitInfo(node: Info) {
-    const info = {
-      title: node.title,
-      description: node.description || undefined,
-      termsOfService: node.termsOfService || undefined,
-      version: node.version || undefined,
-    };
-    if (node.contact) {
-      info["contact"] = {
-        name: node.contact.name || undefined,
-        url: node.contact.url || undefined,
-        email: node.contact.email || undefined,
-      };
+    const extensions: Extension[] = node.getExtensions() || [];
+    for (const extension of extensions) {
+      this.document[extension.name] = extension.value;
     }
-    if (node.license) {
-      info["license"] = {
-        name: node.license.name,
-        url: node.license.url || undefined,
-      };
-    }
-    addExtensions(node, info);
-    this.document["info"] = info;
+    this.document["paths"] = node.paths ? {} : undefined;
+    this.document["components"] = node.components ? {} : undefined;
   }
-  visitItemsSchema(node) {
-    //throw new Error('Method not implemented.');
+
+  // Info Object
+  visitInfo() {
+    // info is handled in visitDocument
   }
-  visitLicense(node: License) {
-    //throw new Error('Method not implemented.');
+  visitContact() {
+    // info.contact is handled in visitDocument
   }
-  visitMediaType(node: License) {
-    //throw new Error('Method not implemented.');
+  visitLicense() {
+    // info.license is handled in visitDocument
   }
-  visitOAuthFlows(node) {}
+
+  // Server Object
+  visitServer(node: Server) {
+    this.document["servers"].push(Library.writeNode(node));
+  }
+
+  // Tag
+  visitTag(node: Tag) {
+    this.document["tags"].push(Library.writeNode(node));
+  }
+
+  visitExternalDocumentation() {
+    // externalDocs for document is handled in visitDocument
+    // externalDocs for tag is handled in visitTag
+    // externalDocs for operation is handled in VisitOperation
+  }
+  visitExtension() {
+    // all extensions and handled within their parent
+  }
+  visitHeader() {
+    // TODO
+  }
+  visitImplicitOAuthFlow() {
+    // TODO
+  }
+  visitOAuthFlows() {
+    // TODO
+  }
+
+  visitItemsSchema() {
+    // items Schema handled in visitSchema
+  }
+
+  visitMediaType() {
+    // mediaTypes handled in VisitOperation
+  }
+
   visitOperation(node: Oas30Operation) {
     const pathKey = getPathKey(node.parent() as Oas30PathItem);
     if (!this.document["paths"][pathKey]["requests"]) {
@@ -278,72 +143,96 @@ export default class Oas30Visitor implements IVisitor {
       }
     }
   }
-  visitParameterDefinition(node: IDefinition) {
-    //throw new Error('Method not implemented.');
-  }
+
   // This method only needs to handle parameters at the pathItem level
   visitParameter(node: Oas30Parameter) {
     if (node.parent() instanceof Oas30PathItem) {
-      if (!["path", "query"].includes(node.in)) {
-        // We currently only handle path and query parameters
-        return;
-      }
       const pathKey = getPathKey(node.parent() as Oas30PathItem);
-      if (!this.document["paths"][pathKey]["parameterSchema"]) {
-        this.document["paths"][pathKey]["parameterSchema"] = {
-          type: "object",
-          properties: {},
-        };
+      const paramSchema = this.document["paths"][pathKey]["parameterSchema"];
+      if (node.$ref) {
+        // use allOf to pull in ref'd parameters
+        paramSchema["allOf"] ??= [];
+        paramSchema["allOf"].push(Library.writeNode(node));
+      } else {
+        paramSchema["properties"] ??= {};
+        paramSchema["properties"][node.name] = Library.writeNode(node.schema);
+        if (node.required) {
+          paramSchema["required"] ??= [];
+          paramSchema["required"].push(node.name);
+        }
       }
-      const oasSchema = node.schema as Oas30Schema;
-      this.document["paths"][pathKey]["parameterSchema"]["properties"][
-        node.name
-      ] = {
-        type: oasSchema.type || undefined,
-        format: oasSchema.format || undefined,
-        description: oasSchema.description || undefined,
-      };
     }
   }
-  visitPaths(node) {
-    this.document["paths"] = {};
+  visitPaths() {
+    // paths are handled in visitDocument
   }
   visitPathItem(node: Oas30PathItem) {
     const pathKey = getPathKey(node);
     this.document["paths"][pathKey] = {
       summary: node.summary || undefined,
       description: node.description || undefined,
+      parameterSchema: node.parameters
+        ? {
+            type: "object",
+          }
+        : undefined,
     };
   }
-  visitPropertySchema(node) {
-    //throw new Error('Method not implemented.');
+  visitPropertySchema() {
+    // property schema are handled in visitSchema
   }
-  visitRequestBody(node: Oas30RequestBody) {}
-  visitRequestBodyDefinition(node) {}
+  visitRequestBody() {
+    // handled in VisitOperation
+  }
+
+  // Components
+  visitComponents() {
+    // components is handled in visitDocument
+  }
   visitSchemaDefinition(node: Oas30SchemaDefinition) {
-    this.document["components"] ??= { schemas: {} };
-    const schema = Library.writeNode(node);
-    this.document["components"]["schemas"][node.getName()] = schema;
+    this.document["components"]["schemas"] ??= {};
+    this.document["components"]["schemas"][node.getName()] =
+      Library.writeNode(node);
   }
-  visitResponses(node) {}
-  visitResponse(node: Oas30Response) {}
-  visitSchema(node: Oas30Schema) {
+  visitParameterDefinition(node: Oas30Parameter) {
+    const paramSchema = {
+      type: "object",
+      properties: {},
+    };
+    paramSchema["properties"][node.name] = Library.writeNode(node.schema);
+    paramSchema["required"] = node.required ? [node.name] : undefined;
+    this.document["components"]["parameters"] ??= {};
+    this.document["components"]["parameters"][node.getName()] = paramSchema;
+  }
+  visitRequestBodyDefinition(node: Oas30RequestBodyDefinition) {
+    this.document["components"]["requestBodies"] ??= {};
+    this.document["components"]["requestBodies"][node.getName()] =
+      Library.writeNode(node);
+  }
+  visitSecurityScheme(node: Oas30SecurityScheme) {
+    this.document["components"]["securitySchemes"] ??= {};
+    this.document["components"]["securitySchemes"][node.getName()] =
+      Library.writeNode(node);
+  }
+  visitAdditionalPropertiesSchema() {
+    // additionalProperties schema are handled in visitSchema
+  }
+  visitResponses() {
+    // responses handled by VisitOperation
+  }
+  visitResponse() {
+    // responses handled by VisitOperation
+  }
+  visitSchema() {
     //throw new Error('Method not implemented.');
   }
-  visitSecurityRequirement(node: SecurityRequirement) {
+  visitSecurityRequirement() {
     //throw new Error('Method not implemented.');
   }
-  visitServer(node) {
+  visitValidationProblem() {
     //throw new Error('Method not implemented.');
   }
-  visitSecurityScheme(node: SecurityScheme) {
-    //throw new Error('Method not implemented.');
+  visitXML() {
+    // Xml handled in visitSchema
   }
-  visitTag(node: Tag) {
-    //throw new Error('Method not implemented.');
-  }
-  visitValidationProblem(problem: ValidationProblem) {
-    //throw new Error('Method not implemented.');
-  }
-  visitXML(node) {}
 }
