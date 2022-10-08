@@ -18,21 +18,21 @@ program
 program.parse(process.argv);
 
 // Get the OpenAPI document
-let openApiData: string = readFileSync(program.args[0], "utf8");
+const openApiData: string = readFileSync(program.args[0], "utf8");
 
 // Use the library util to create a data model instance from the given
 // data.  This will convert from the source string into an instance of
 // the OpenAPI data model.
-let document: Document = Library.readDocumentFromJSONString(openApiData);
+const document: Document = Library.readDocumentFromJSONString(openApiData);
 
 // Validate that your changes are OK.
-let problems = await Library.validateDocument(document, null, []);
+const problems = await Library.validateDocument(document, null, []);
 if (problems.length > 0) {
   console.error("Validation failed on input document.\n");
   console.error(JSON.stringify(problems, null, 2));
   exit(1);
 }
 
-let visitor: MyCustomVisitor = new MyCustomVisitor();
+const visitor: MyCustomVisitor = new MyCustomVisitor();
 Library.visitTree(document, visitor, TraverserDirection.down);
 console.log(JSON.stringify(visitor.document, null, 2));

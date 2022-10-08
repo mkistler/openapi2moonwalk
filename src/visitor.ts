@@ -7,7 +7,6 @@ import {
   Info,
   Library,
   License,
-  Parameter,
   SecurityRequirement,
   SecurityScheme,
   Tag,
@@ -20,12 +19,8 @@ import {
   Oas30Schema,
   Oas30RequestBody,
   Oas30Response,
-  Schema,
   Oas30SchemaDefinition,
 } from "@apicurio/data-models";
-import { notEqual } from "assert";
-import { Console } from "console";
-import { ReadableStreamBYOBRequest } from "stream/web";
 
 function addExtensions(node: Info, object) {
   const extensions: Extension[] = node.getExtensions() || [];
@@ -52,7 +47,7 @@ function getPathKey(node: Oas30PathItem): string {
       node.patch,
       node.delete,
     ] as Oas30Operation[];
-    var queryParams: Set<string> = new Set();
+    const queryParams: Set<string> = new Set();
     for (const op of pathOps.filter((v) => v !== null)) {
       qpsForOp(op).forEach((name) => queryParams.add(name));
     }
@@ -73,7 +68,7 @@ class OperationVisitor implements IVisitor {
     this.contentType = contentType;
   }
   visitExtension(node: Extension) {
-    throw new Error("Method not implemented.");
+    this.request[node.name] = node.value;
   }
   visitExternalDocumentation(node: ExternalDocumentation) {
     throw new Error("Method not implemented.");
@@ -81,7 +76,7 @@ class OperationVisitor implements IVisitor {
   visitInfo(node: Info) {}
   visitLicense(node: License) {}
   visitOperation(node: Oas30Operation) {
-    var parameterSchema = node.parameters?.some((p) =>
+    const parameterSchema = node.parameters?.some((p) =>
       ["path", "query"].includes(p.in)
     )
       ? {
@@ -262,14 +257,17 @@ export default class Oas30Visitor implements IVisitor {
       node.requestBody?.getMediaTypes().map((n) => n.getName()) || [];
     if (contentTypes.length <= 1) {
       const contentType = contentTypes.find(Boolean) || undefined;
-      let opVisitor: OperationVisitor = new OperationVisitor(contentType);
+      const opVisitor: OperationVisitor = new OperationVisitor(contentType);
       Library.visitTree(node, opVisitor, TraverserDirection.down);
       const requestKey = node.operationId || node.getMethod();
       this.document["paths"][pathKey]["requests"][requestKey] =
         opVisitor.request;
     } else {
+      // When the request body has multiple content types we create a separate request
+      // for each content type. The request name is formed by concatenating the operationId
+      // (or http method if no operationId) with a sanitized content-type
       for (const contentType of contentTypes) {
-        let opVisitor: OperationVisitor = new OperationVisitor(contentType);
+        const opVisitor: OperationVisitor = new OperationVisitor(contentType);
         Library.visitTree(node, opVisitor, TraverserDirection.down);
         const requestKey =
           (node.operationId || node.getMethod()) +
@@ -279,7 +277,6 @@ export default class Oas30Visitor implements IVisitor {
           opVisitor.request;
       }
     }
-    //throw new Error('Method not implemented.');
   }
   visitParameterDefinition(node: IDefinition) {
     //throw new Error('Method not implemented.');
