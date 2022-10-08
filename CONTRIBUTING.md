@@ -1,4 +1,12 @@
 
+## Setup
+
+Clone the repo and from the root directory
+
+```
+npm install
+```
+
 ## How to Build
 
 ```
