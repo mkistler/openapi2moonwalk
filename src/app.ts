@@ -28,8 +28,8 @@ let document: Document = Library.readDocumentFromJSONString(openApiData);
 // Validate that your changes are OK.
 let problems = await Library.validateDocument(document, null, []);
 if (problems.length > 0) {
-  console.log("Validation failed on input document.\n");
-  console.log(JSON.stringify(problems, null, 2));
+  console.error("Validation failed on input document.\n");
+  console.error(JSON.stringify(problems, null, 2));
   exit(1);
 }
 
