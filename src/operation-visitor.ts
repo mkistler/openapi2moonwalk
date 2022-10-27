@@ -1,5 +1,5 @@
 import {
-  IVisitor,
+  CombinedVisitorAdapter,
   Extension,
   ExternalDocumentation,
   Library,
@@ -11,10 +11,11 @@ import {
 } from "@apicurio/data-models";
 
 // Construct a request for the operation using just the specified contentType request body
-export default class OperationVisitor implements IVisitor {
+export default class OperationVisitor extends CombinedVisitorAdapter {
   request: object = {};
   contentType: string;
   constructor(contentType: string) {
+    super();
     this.contentType = contentType;
   }
   visitExtension(node: Extension) {
@@ -125,43 +126,5 @@ export default class OperationVisitor implements IVisitor {
   }
   visitResponses() {
     // responses are handled individually in visitResponse
-  }
-  visitSchema() {
-    // no special processing needed for schemas
-  }
-  visitItemsSchema() {
-    // no special processing needed for items schemas
-  }
-  visitAdditionalPropertiesSchema() {
-    // no special processing needed for items additionalProperties schemas
-  }
-  // Unneeded methods
-  // Should never be called since visitor only acts on operations
-  visitInfo() {
-    throw new Error("Method not implemented.");
-  }
-  visitLicense() {
-    throw new Error("Method not implemented.");
-  }
-  visitContact() {
-    throw new Error("Method not implemented.");
-  }
-  visitDocument() {
-    throw new Error("Method not implemented.");
-  }
-  visitParameterDefinition() {
-    throw new Error("Method not implemented.");
-  }
-  visitSchemaDefinition() {
-    throw new Error("Method not implemented.");
-  }
-  visitSecurityScheme() {
-    throw new Error("Method not implemented.");
-  }
-  visitTag() {
-    throw new Error("Method not implemented.");
-  }
-  visitValidationProblem() {
-    throw new Error("Method not implemented.");
   }
 }
